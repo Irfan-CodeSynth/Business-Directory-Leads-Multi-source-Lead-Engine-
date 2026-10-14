@@ -1,0 +1,50 @@
+# Render blueprint: the dashboard only.
+#
+# The worker is intentionally absent. An always-on worker polls the queue every few seconds, which
+# keeps a free Postgres awake continuously and burns Neon's 100 CU-hours and Render's 750 instance
+# hours within days. Run the worker on your own machine with `npm run worker` instead; the dashboard
+# here stays reachable from anywhere.
+services:
+  - type: web
+    name: directory-leads-web
+    env: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: >-
+      npm ci &&
+      npm run build -w @dleads/web &&
+      cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+    startCommand: >-
+      cd apps/web/.next/standalone &&
+      HOSTNAME=0.0.0.0 PORT=$PORT NODE_ENV=production
+      node apps/web/server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.0
+      # Next.js needs to know it is not talking to a localhost database.
+      # Pooled Neon endpoint, e.g. postgres://user:pass@ep-name-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      # Long random string. Rotating it signs everyone out.
+      - key: SESSION_SECRET
+        generateValue: secret
+      # Left blank in the blueprint: fill in the Render dashboard, or set to
+      # `sync: false` to read from your local .env on first push.
+      - key: POLL_INTERVAL_MS
+        value: "5000"
+      # Stated explicitly even though it is the default: one connection per process, with the
+      # page's queries pipelined over it. Shared Postgres front-ends (PGlite's dev socket, a
+      # pooler) cross-wire the bind parameters of *concurrent* connections, and the error only
+      # shows up as a broken dashboard, never as a warning.
+      - key: POOL_MAX
+        value: "1"
+      # Paid sources only. This cap is what the dashboard counts its "results left this month"
+      # against, so keep it the same number the worker on your machine uses.
+      - key: APIFY_MONTHLY_RESULT_CAP
+        value: "1500"
+      # Not stored here - Render asks for it once, or set it in the dashboard. The web never calls
+      # Apify; it only says whether a token is present at all, so leaving it blank is a valid choice
+      # (the New run form then reports the paid sources as switched off).
+      - key: APIFY_API_TOKEN
+        sync: false

@@ -1,0 +1,1 @@
+ALTER TABLE "jobs" ADD COLUMN "lead_target" integer DEFAULT 100 NOT NULL;

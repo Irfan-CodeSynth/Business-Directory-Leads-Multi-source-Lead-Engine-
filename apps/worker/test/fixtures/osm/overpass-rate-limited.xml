@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<remark>
+  <status>429</status>
+  <remark>Too many requests: you have to wait 41 seconds before sending another request to this endpoint, or use another mirror instance. Please check the rules at https://wiki.openstreetmap.org/wiki/Overpass_API/Element_Limits and consider using https://overpass.kumi.systems</remark>
+</remark>

@@ -1,0 +1,1 @@
+ALTER TABLE "job_source_stats" ADD COLUMN "results_pulled" integer DEFAULT 0 NOT NULL;

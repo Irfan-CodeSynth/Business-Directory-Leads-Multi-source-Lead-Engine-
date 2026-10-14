@@ -1,0 +1,21 @@
+{
+  "name": "directory-leads",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "db:dev": "tsx scripts/devdb.ts 5434",
+    "db:generate": "npm run db:generate -w @dleads/db",
+    "db:migrate": "npm run db:migrate -w @dleads/db",
+    "db:seed": "npm run db:seed -w @dleads/db",
+    "worker": "npm run dev -w @dleads/worker",
+    "web": "npm run dev -w @dleads/web",
+    "test": "npm run test -w @dleads/db && npm run test -w @dleads/worker && npm run test -w @dleads/web"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-socket": "^0.2.11"
+  }
+}

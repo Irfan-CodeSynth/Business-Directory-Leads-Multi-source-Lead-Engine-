@@ -1,0 +1,14 @@
+[
+  {
+    "place_id": 99001,
+    "osm_type": "node",
+    "osm_id": 99001,
+    "lat": "31.2",
+    "lon": "-100.05",
+    "boundingbox": ["25.9", "36.5", "-106.6", "-93.5"],
+    "class": "place",
+    "type": "state",
+    "addresstype": "state",
+    "display_name": "Texas, United States"
+  }
+]

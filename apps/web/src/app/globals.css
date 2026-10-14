@@ -1,0 +1,304 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+
+  --c-page: 246 247 251;
+  --c-surface: 255 255 255;
+  --c-surface-2: 248 250 252;
+  --c-line: 226 232 240;
+  --c-line-strong: 203 213 225;
+  --c-ink: 15 23 42;
+  --c-muted: 100 116 139;
+  --c-soft: 148 163 184;
+
+  --c-accent: 79 70 229;
+  --c-accent-dark: 67 56 202;
+  --c-accent-strong: 79 70 229;
+  --c-accent-soft: 238 242 255;
+
+  --c-ok-bg: 209 250 229;
+  --c-ok-fg: 21 128 61;
+  --c-info-bg: 224 242 254;
+  --c-info-fg: 3 105 161;
+  --c-warn-bg: 254 243 199;
+  --c-warn-fg: 180 83 9;
+  --c-bad-bg: 254 226 226;
+  --c-bad-fg: 185 28 28;
+  --c-idle-bg: 241 245 249;
+  --c-idle-fg: 71 85 105;
+
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 24px -14px rgb(15 23 42 / 0.14);
+  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.05), 0 18px 36px -18px rgb(15 23 42 / 0.22);
+  --shadow-accent: 0 8px 20px -8px rgb(79 70 229 / 0.45);
+}
+
+/* One block flips the whole app; components never carry dark: variants. */
+.dark {
+  color-scheme: dark;
+
+  --c-page: 8 12 22;
+  --c-surface: 18 25 41;
+  --c-surface-2: 24 32 52;
+  --c-line: 38 49 74;
+  --c-line-strong: 55 68 96;
+  --c-ink: 228 234 246;
+  --c-muted: 148 161 190;
+  --c-soft: 107 122 153;
+
+  /* Light enough to read as text on a dark surface, while filled buttons keep a
+     deep pair so white label text never drops below a readable contrast. */
+  --c-accent: 129 140 248;
+  --c-accent-dark: 99 102 241;
+  --c-accent-strong: 79 70 229;
+  --c-accent-soft: 34 40 82;
+
+  --c-ok-bg: 12 54 38;
+  --c-ok-fg: 110 231 183;
+  --c-info-bg: 10 44 66;
+  --c-info-fg: 125 211 252;
+  --c-warn-bg: 58 40 8;
+  --c-warn-fg: 252 211 77;
+  --c-bad-bg: 58 20 24;
+  --c-bad-fg: 252 165 165;
+  --c-idle-bg: 30 38 56;
+  --c-idle-fg: 148 163 184;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 28px -16px rgb(0 0 0 / 0.6);
+  --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.35), 0 22px 44px -20px rgb(0 0 0 / 0.7);
+  --shadow-accent: 0 8px 22px -10px rgb(124 131 255 / 0.5);
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: rgb(var(--c-page));
+  color: rgb(var(--c-ink));
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(at 15% 10%, rgb(var(--c-accent) / 0.05) 0px, transparent 45%),
+    radial-gradient(at 85% 90%, rgb(var(--c-info-fg) / 0.04) 0px, transparent 45%);
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-image:
+    radial-gradient(at 20% 0%, rgb(var(--c-accent) / 0.09) 0px, transparent 55%),
+    radial-gradient(at 80% 100%, rgb(var(--c-info-fg) / 0.07) 0px, transparent 55%);
+  background-attachment: fixed;
+}
+
+.glass-card {
+  background-color: rgb(var(--c-surface) / 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgb(var(--c-line) / 0.8);
+  box-shadow: var(--shadow-card);
+}
+
+.glass-card-hover {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgb(var(--c-accent) / 0.4);
+  box-shadow: var(--shadow-lift), 0 0 24px -10px rgb(var(--c-accent) / 0.25);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, rgb(var(--c-ink)) 40%, rgb(var(--c-accent)) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+::selection {
+  background: rgb(var(--c-accent) / 0.22);
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--c-accent) / 0.7);
+  outline-offset: 2px;
+}
+
+/* Form fields carry their own accent ring, so the global outline would double it. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+/* Only the theme flip should animate, never every hover. */
+html.theme-transition,
+html.theme-transition * {
+  transition: background-color 0.28s ease, border-color 0.28s ease, color 0.28s ease;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-line-strong) / 0.7);
+  border: 2px solid rgb(var(--c-page));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--c-soft) / 0.9);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -220% 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.72);
+  }
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%) scaleX(0.3);
+  }
+  50% {
+    transform: translateX(28%) scaleX(0.6);
+  }
+  100% {
+    transform: translateX(104%) scaleX(0.3);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-fade-in {
+  animation: fade-in 0.4s ease both;
+}
+.animate-scale-in {
+  animation: scale-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-slide-in {
+  animation: slide-in-right 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.3s ease-in-out infinite;
+}
+.animate-spin-slow {
+  animation: spin 0.9s linear infinite;
+}
+
+.bar-fill {
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bar-indeterminate {
+  animation: indeterminate 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.shimmer {
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(var(--c-ink) / 0.045) 45%,
+    transparent 70%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 2.4s ease-in-out infinite;
+}
+
+/* Staggered table rows: index feeds the delay, the class feeds the motion. */
+.row-in {
+  animation: fade-up 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+input[type="checkbox"] {
+  accent-color: rgb(var(--c-accent));
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+

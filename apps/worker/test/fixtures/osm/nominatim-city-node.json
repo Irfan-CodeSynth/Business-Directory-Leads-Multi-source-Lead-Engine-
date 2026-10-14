@@ -1,0 +1,14 @@
+[
+  {
+    "place_id": 101234567,
+    "osm_type": "node",
+    "osm_id": 5814674,
+    "lat": "31.0025",
+    "lon": "-97.704",
+    "boundingbox": ["31.002", "31.003", "-97.7045", "-97.7035"],
+    "class": "place",
+    "type": "city",
+    "importance": 0.6,
+    "display_name": "Harker Heights, Bell County, Texas, United States"
+  }
+]

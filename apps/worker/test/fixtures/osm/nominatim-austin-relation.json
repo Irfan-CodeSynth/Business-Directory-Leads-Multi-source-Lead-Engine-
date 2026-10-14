@@ -1,0 +1,23 @@
+[
+  {
+    "place_id": 2654067,
+    "osm_type": "relation",
+    "osm_id": 2097303,
+    "lat": "30.2672",
+    "lon": "-97.7431",
+    "boundingbox": ["30.1", "30.55", "-97.99", "-97.55"],
+    "class": "boundary",
+    "type": "administrative",
+    "addresstype": "city",
+    "importance": 0.801,
+    "rank": 18,
+    "display_name": "Austin, Travis County, Texas, United States",
+    "address": {
+      "city": "Austin",
+      "county": "Travis County",
+      "state": "Texas",
+      "country": "United States",
+      "country_code": "us"
+    }
+  }
+]

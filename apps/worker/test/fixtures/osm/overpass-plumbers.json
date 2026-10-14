@@ -1,0 +1,143 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 (fixture)",
+  "osm3s": {
+    "timestamp_osm_base": "2026-09-30T00:00:00Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+    {
+      "type": "node",
+      "id": 440000001,
+      "lat": 30.2672,
+      "lon": -97.7431,
+      "tags": {
+        "name": "Lone Star Plumbers, Inc.",
+        "craft": "plumber",
+        "phone": "+1 512-555-0142",
+        "contact:phone": "(512) 555-0199",
+        "website": "https://lonestarplumbing.example.com",
+        "email": "Dispatch@LoneStarPlumbing.example.COM ",
+        "addr:housenumber": "1104",
+        "addr:street": "E Cesar Chavez St",
+        "addr:city": "Austin",
+        "addr:state": "TX",
+        "addr:postcode": "78702-5304",
+        "contact:instagram": "instagram.com/lonestarplumb",
+        "contact:facebook": "https://www.facebook.com/lonestarplumbing",
+        "contact:linkedin": "https://www.linkedin.com/company/lonestarplumbing",
+        "contact:skype": "lonestarplumb",
+        "opening_hours": "Mo-Fr 08:00-17:00",
+        "description": "Residential and light commercial plumbing"
+      }
+    },
+    {
+      "type": "way",
+      "id": 880000002,
+      "center": { "lat": 30.31, "lon": -97.79 },
+      "tags": {
+        "name": "Hill Country Auto Repair",
+        "shop": "car_repair",
+        "phone": "512.555.0188",
+        "addr:city": "Austin",
+        "addr:postcode": "78757",
+        "website": "hillcountryauto.example.com"
+      }
+    },
+    {
+      "type": "node",
+      "id": 440000003,
+      "lat": 30.29,
+      "lon": -97.7,
+      "tags": {
+        "amenity": "fuel",
+        "brand": "Unknown Forecourt"
+      }
+    },
+    {
+      "type": "node",
+      "id": 440000004,
+      "lat": 30.25,
+      "lon": -97.76,
+      "tags": {
+        "name": "Old Town Plumbing",
+        "craft": "plumber",
+        "phone": "+1 512 555 0111",
+        "abandoned": "yes"
+      }
+    },
+    {
+      "type": "relation",
+      "id": 550000005,
+      "tags": {
+        "name": "Brazmos Plumbing LLC",
+        "addr:full": "PO Box 12, Austin, TX 78701",
+        "website": "https://www.brazmos.example.com/contact"
+      }
+    },
+    {
+      "type": "node",
+      "id": 440000006,
+      "lat": 30.24,
+      "lon": -97.77,
+      "tags": {
+        "name": "X",
+        "shop": "kitchen"
+      }
+    },
+    {
+      "type": "node",
+      "id": 440000007,
+      "lat": 30.28,
+      "lon": -97.72,
+      "tags": {
+        "name": "Sketchy Signs",
+        "shop": "signs",
+        "facebook": "not a url",
+        "contact:twitter": "@sketchysigns"
+      }
+    },
+    {
+      "type": "node",
+      "id": 440000008,
+      "lat": 30.33,
+      "lon": -97.81,
+      "tags": {
+        "name": "Pecos Pipe Works",
+        "craft": "plumber",
+        "phone": "512 555 0177 x 4",
+        "email": "mailto:pipeline@example.org",
+        "contact:youtube": "https://youtube.com/@pecospipeworks"
+      }
+    },
+    {
+      "type": "node",
+      "id": 440000009,
+      "lat": 30.35,
+      "lon": -97.83,
+      "tags": {
+        "name": "Deep Flow Drainage",
+        "craft": "plumber"
+      }
+    },
+    {
+      "type": "way",
+      "id": 880000010,
+      "center": { "lat": 30.29, "lon": -97.72 },
+      "tags": {
+        "name": "Plumbago Drive",
+        "highway": "residential"
+      }
+    },
+    {
+      "type": "node",
+      "id": 440000011,
+      "lat": 30.4,
+      "lon": -97.68,
+      "tags": {
+        "name": "Plumbrook",
+        "place": "suburb"
+      }
+    }
+  ]
+}

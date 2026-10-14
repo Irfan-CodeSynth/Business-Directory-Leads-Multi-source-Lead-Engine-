@@ -1,0 +1,1 @@
+ALTER TABLE "website_observations" ADD COLUMN "phone" text;
