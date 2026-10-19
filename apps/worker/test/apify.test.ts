@@ -208,6 +208,26 @@ describe("itemToLead: hotfrog", () => {
       twitter: "https://x.com/acmeroofing",
     });
   });
+
+  it("unwraps the Python-repr phone array HotFrog actually publishes", () => {
+    const lead = itemToLead("hotfrog", hotfrogItem({ phone: "['+12014510049']" }))!;
+    expect(lead.phone).toBe("+12014510049");
+  });
+
+  it("takes the first of several published numbers, whatever carries them", () => {
+    const repr = itemToLead("hotfrog", hotfrogItem({ phone: "['+1868300931', '+18685550123']" }))!;
+    expect(repr.phone).toBe("+1868300931");
+    const asArray = itemToLead("hotfrog", hotfrogItem({ phone: ["+1868300931", "+18685550123"] }))!;
+    expect(asArray.phone).toBe("+1868300931");
+    const asJson = itemToLead("hotfrog", hotfrogItem({ phone: '["+1868300931"]' }))!;
+    expect(asJson.phone).toBe("+1868300931");
+  });
+
+  it("keeps a plain phone string untouched and a missing one null", () => {
+    expect(itemToLead("yelp", yelpItem({ phoneNumber: "(512) 555-0142" }))!.phone).toBe("(512) 555-0142");
+    expect(itemToLead("hotfrog", hotfrogItem({ phone: null }))!.phone).toBeNull();
+    expect(itemToLead("hotfrog", hotfrogItem({ phone: "[]" }))!.phone).toBeNull();
+  });
 });
 
 describe("itemToLead: what may never be stored", () => {
@@ -418,6 +438,49 @@ describe("createApifyAdapter().search", () => {
       expect((err as BlockedError).source).toBe("yelp");
       expect((err as BlockedError).message).toContain(why);
     }
+  });
+
+  it("blocks the source when the site served the Actor nothing, and says its reason", async () => {
+    // Both Actors exit `SUCCEEDED` with an empty dataset when the directory refuses them,
+    // and put the reason in `statusMessage`. Read it or a blocked run looks exactly like a
+    // search that has no businesses, and the only fix — re-run later — is invisible.
+    const made = harness({
+      source: "yelp",
+      items: [],
+      runBody: {
+        id: "run1",
+        defaultDatasetId: "ds1",
+        status: "SUCCEEDED",
+        statusMessage:
+          "No data: Yelp did not serve the search pages for this run (temporary block or rate limit). Re-run — the next attempt usually succeeds.",
+      },
+    });
+    const err = await made.adapter.search(unit, made.hooks).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(BlockedError);
+    expect((err as BlockedError).source).toBe("yelp");
+    expect((err as BlockedError).message).toMatch(/did not serve the search pages/i);
+  });
+
+  it("reads the reason from the poll that finished the run", async () => {
+    const made = harness({
+      source: "yelp",
+      items: [],
+      runBody: { id: "run1", defaultDatasetId: "ds1", status: "RUNNING" },
+      pollBody: {
+        id: "run1",
+        defaultDatasetId: "ds1",
+        status: "SUCCEEDED",
+        statusMessage: "No data: HotFrog returned no listings.",
+      },
+    });
+    const err = await made.adapter.search(unit, made.hooks).catch((e: unknown) => e);
+    expect((err as BlockedError).message).toMatch(/returned no listings/i);
+  });
+
+  it("leaves a search that genuinely has no businesses a clean zero", async () => {
+    const made = harness({ source: "yelp", items: [] });
+    const outcome = await made.adapter.search(unit, made.hooks);
+    expect(outcome).toMatchObject({ emitted: 0, stopped: false });
   });
 
   it("reports a bad actor slug as an error, not a block", async () => {

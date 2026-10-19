@@ -63,15 +63,16 @@ export const cents = (value: number): number => Math.round(value * 100) / 100;
 export const usd = (value: number): string => `$${value.toFixed(2)}`;
 
 /**
- * What stopped a source. A blocked free source waits for a courtesy window; a blocked
- * paid source waits for money or a cap, and re-running it any sooner sends no request
- * either way — saying "rate-limited" for both invites a pointless retry loop.
+ * What stopped a source. A blocked free source waits for a courtesy window. A blocked paid
+ * source has two possible reasons — the account cannot pay, or the directory refused the
+ * collector mid-run — and the Actor's own words are printed under this hint, so the hint
+ * has to leave room for both and point at the one action that helps either way.
  */
 export function blockedHint(source: string): string {
   if (!isPaidSource(source)) {
     return "Rate-limited by the source. Nothing else failed — re-run just this source once the courtesy window clears.";
   }
-  return "Stopped before any request went out, so this attempt billed nothing. Check the Apify account's credit and APIFY_MONTHLY_RESULT_CAP, then re-run just this source.";
+  return "Apify bills per result, so an attempt that collected none cost only the actor's flat start charge. The line below is the collector's own reason: a temporary block by the directory clears on its own, so re-run just this source later — and check the account's credit and APIFY_MONTHLY_RESULT_CAP if every re-run says the same.";
 }
 
 /** What `results` results cost on this source, to the cent. */

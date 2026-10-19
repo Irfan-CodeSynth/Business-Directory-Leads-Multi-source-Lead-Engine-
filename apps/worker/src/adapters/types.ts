@@ -103,9 +103,11 @@ export interface SearchOutcome {
  */
 export class BlockedError extends Error {
   readonly source: Source;
-  readonly status: number;
+  /** The HTTP status that refused us, when a status did. A directory can also just stop
+   *  serving the page, which is a block with no code to show for it. */
+  readonly status?: number;
 
-  constructor(source: Source, message: string, status: number) {
+  constructor(source: Source, message: string, status?: number) {
     super(message);
     this.name = "BlockedError";
     this.source = source;

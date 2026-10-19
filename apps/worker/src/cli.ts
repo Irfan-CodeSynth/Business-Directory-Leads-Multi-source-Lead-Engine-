@@ -64,7 +64,7 @@ try {
   }
 } catch (err) {
   if (err instanceof BlockedError) {
-    console.error(`\nBLOCKED (HTTP ${err.status}): ${err.message}`);
+    console.error(`\nBLOCKED${err.status ? ` (HTTP ${err.status})` : ""}: ${err.message}`);
     console.error("A job would mark this source `blocked`, still finish `done`, and can re-run it later.");
     process.exit(3);
   }

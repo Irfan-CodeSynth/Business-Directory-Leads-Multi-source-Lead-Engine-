@@ -74,6 +74,10 @@ describe("blockedHint", () => {
     expect(note).toMatch(/Apify/);
     expect(note).toMatch(/cap/i);
     expect(note).not.toMatch(/courtesy/);
+    // A paid source is also blocked when the directory refuses the Actor mid-run, so the
+    // hint must not promise that nothing was sent, and must not point only at credit.
+    expect(note).not.toMatch(/before any request/);
+    expect(note).toMatch(/re-run/i);
   });
 });
 

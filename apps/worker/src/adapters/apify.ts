@@ -201,6 +201,41 @@ export function stripReviews(item: ApifyItem): ApifyItem {
   return out;
 }
 
+/**
+ * Phones arrive in more shapes than any one Actor documents: a plain string, a real
+ * array, a JSON array string, or — what HotFrog actually writes — a Python repr
+ * `"['+12014510049']"`. The first usable number wins.
+ */
+function phoneValue(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const found = phoneValue(entry);
+      if (found) return found;
+    }
+    return null;
+  }
+  const text = str(value);
+  if (!text) return null;
+  if (/^\[.*\]$/.test(text)) {
+    const inner = text.slice(1, -1).trim();
+    if (!inner) return null;
+    const parsed = tryJson(`[${inner}]`);
+    if (Array.isArray(parsed)) return phoneValue(parsed);
+    const quoted = inner.match(/['"]([^'"]*)['"]/);
+    return quoted ? str(quoted[1]) : null;
+  }
+  return text;
+}
+
+/** `firstStr`, but through `phoneValue`: a phone is never just one string shape. */
+function firstPhone(item: ApifyItem, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const found = phoneValue(item[key]);
+    if (found) return found;
+  }
+  return null;
+}
+
 /** Yelp publishes an id, HotFrog does not; the listing url is the next best thing. */
 function externalIdOf(source: PaidSource, item: ApifyItem, name: string, phone: string | null): string {
   const id = firstStr(item, "yelp_biz_id", "business_id", "businessId", "place_id");
@@ -213,7 +248,7 @@ export function itemToLead(source: PaidSource, item: ApifyItem): RawLead | null 
   const name = firstStr(item, "title", "name", "business_name", "company");
   if (!name) return null;
 
-  const phone = firstStr(item, "phone", "phoneNumber", "phone1", "telephone");
+  const phone = firstPhone(item, "phone", "phoneNumber", "phone1", "telephone");
   const emails = emailsFrom(
     source === "hotfrog"
       ? firstStr(item, "email", "emails") ?? undefined
@@ -344,7 +379,12 @@ export function parseDatasetItems(payload: unknown): ApifyItem[] {
 }
 
 /** A run object, with or without the `data` envelope that wraps most API responses. */
-export function parseRun(payload: unknown): { runId: string | null; datasetId: string | null; status: string | null } {
+export function parseRun(payload: unknown): {
+  runId: string | null;
+  datasetId: string | null;
+  status: string | null;
+  statusMessage: string | null;
+} {
   const value = typeof payload === "string" ? tryJson(payload) : payload;
   const run = (value as { data?: unknown } | null)?.data ?? value;
   const record = (run ?? {}) as Record<string, unknown>;
@@ -352,6 +392,7 @@ export function parseRun(payload: unknown): { runId: string | null; datasetId: s
     runId: str(record.id ?? record.runId),
     datasetId: str(record.defaultDatasetId ?? record.datasetId),
     status: str(record.status),
+    statusMessage: str(record.statusMessage),
   };
 }
 
@@ -467,7 +508,7 @@ export function createApifyAdapter(options: ApifyAdapterOptions): SourceAdapter 
         `run ${label}`,
       );
 
-      let { runId, datasetId, status } = parseRun(run.body);
+      let { runId, datasetId, status, statusMessage } = parseRun(run.body);
       // Every answer costs a request, so the wait is capped at APIFY_RUN_TIMEOUT_S worth
       // of them. Past that the Actor is still running on Apify's clock and a re-run of the
       // source is cheaper than an idle worker.
@@ -489,6 +530,7 @@ export function createApifyAdapter(options: ApifyAdapterOptions): SourceAdapter 
         runId = next.runId ?? runId;
         datasetId = next.datasetId ?? datasetId;
         status = next.status ?? status;
+        statusMessage = next.statusMessage ?? statusMessage;
       }
       if (stopped) return { emitted, requestsUsed: hooks.budget.spent(), stopped };
       if (status && status !== "SUCCEEDED") {
@@ -514,6 +556,14 @@ export function createApifyAdapter(options: ApifyAdapterOptions): SourceAdapter 
       // Billed for everything the Actor returned, even the rows it oversupplied past
       // the cap or that turned out not to be businesses.
       spend.charge(results.length);
+
+      // An Actor the directory stopped serving exits `SUCCEEDED` with an empty dataset and
+      // explains itself in `statusMessage`. Passing that through is the difference between
+      // a `blocked` source the dashboard offers to re-run and a `done` one that quietly
+      // collected nothing. A search with nothing to find gets no message, so it stays `done`.
+      if (results.length === 0 && statusMessage) {
+        throw new BlockedError(source, `${source} ${label}: ${statusMessage}`);
+      }
 
       let dropped = 0;
       for (const item of results) {
