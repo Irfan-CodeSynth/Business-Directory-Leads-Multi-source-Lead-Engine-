@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import type { SearchSpec } from "./search.js";
 
 /**
  * Source ids are plain text columns with TS-only enum typing, so adding a source
@@ -47,6 +48,13 @@ export const jobs = pgTable(
     id: serial("id").primaryKey(),
     keywords: text("keywords").array().notNull(),
     locations: text("locations").array().notNull(),
+    /**
+     * Structured single-search spec written by the New run form (one keyword,
+     * category, country, state, city). When set, the worker runs one structured
+     * search per source and ignores the keyword x location matrix; when null the
+     * legacy matrix path runs, so old queued jobs are untouched.
+     */
+    searchSpec: jsonb("search_spec").$type<SearchSpec | null>(),
     sources: text("sources", { enum: sources }).array().notNull(),
     /** Cap per keyword x location x source. Keeps free-tier runs modest by design. */
     maxItems: integer("max_items").notNull().default(25),

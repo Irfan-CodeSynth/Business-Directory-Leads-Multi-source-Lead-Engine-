@@ -1,3 +1,4 @@
+import { locationLine, parseSearchSpec, type SearchSpec } from "@dleads/db/search";
 import { applyMapping, isMappingUsable, type MappableField } from "./csv";
 import { cents, estimateCost, sourceLabel, sourcePrice } from "./sourceMeta";
 
@@ -5,8 +6,12 @@ import { cents, estimateCost, sourceLabel, sourcePrice } from "./sourceMeta";
 export interface JobFormState {
   tab: "discover" | "import";
   sources: string[];
-  keywords: string[];
-  locations: string[];
+  /** Single structured search — exactly one keyword in exactly one place. */
+  keyword: string;
+  category: string;
+  country: string;
+  state: string;
+  city: string;
   cap: number;
   /** New leads one source should add before the run stops itself. */
   target: number;
@@ -16,8 +21,10 @@ export interface JobFormState {
 }
 
 export interface JobRequestBody {
+  /** Display arrays for the Runs pages; the worker searches `searchSpec`. */
   keywords: string[];
   locations: string[];
+  searchSpec: SearchSpec | null;
   sources: string[];
   maxItems: number;
   leadTarget: number;
@@ -27,12 +34,9 @@ export interface JobRequestBody {
 
 export type JobRequest = { ok: true; body: JobRequestBody } | { ok: false; error: string };
 
-/** `apps/api/jobs` route rejects longer lists, so say so here instead of failing on submit. */
-const MAX_LIST_ITEMS = 20;
-
 /**
  * The Import tab owns its own source, so which tab is showing decides the payload:
- * a pasted list must never go out as `sources: ["osm"]` with empty keywords.
+ * a pasted list must never go out as `sources: ["osm"]` with an empty search spec.
  */
 export function buildJobRequest(state: JobFormState): JobRequest {
   if (state.tab === "import") {
@@ -43,8 +47,9 @@ export function buildJobRequest(state: JobFormState): JobRequest {
     return {
       ok: true,
       body: {
-        keywords: state.keywords,
-        locations: state.locations,
+        keywords: [],
+        locations: [],
+        searchSpec: null,
         sources: ["csv"],
         maxItems: state.cap,
         // Inert for an import — the worker takes the whole list whatever this says —
@@ -57,20 +62,21 @@ export function buildJobRequest(state: JobFormState): JobRequest {
   }
 
   if (!state.sources.length) return { ok: false, error: "Pick at least one source" };
-  // Every directory source — free or paid — asks its question of the keyword x location
-  // matrix, so one message covers all of them.
-  if (state.sources.some((source) => source !== "csv") && (!state.keywords.length || !state.locations.length)) {
-    return { ok: false, error: "Discovery needs at least one keyword and one location" };
-  }
-  if (state.keywords.length > MAX_LIST_ITEMS || state.locations.length > MAX_LIST_ITEMS) {
-    return { ok: false, error: `Too many keywords or locations (max ${MAX_LIST_ITEMS} each)` };
-  }
+  const parsed = parseSearchSpec({
+    keyword: state.keyword,
+    category: state.category,
+    country: state.country,
+    state: state.state,
+    city: state.city,
+  });
+  if (!parsed.ok) return { ok: false, error: parsed.error };
 
   return {
     ok: true,
     body: {
-      keywords: state.keywords,
-      locations: state.locations,
+      keywords: [parsed.spec.keyword],
+      locations: [locationLine(parsed.spec, "full")],
+      searchSpec: parsed.spec,
       sources: state.sources,
       maxItems: state.cap,
       leadTarget: state.target,
@@ -94,32 +100,31 @@ export interface RunEstimate {
 }
 
 /**
- * The same question the worker will ask — one query per keyword x location pair — but
- * answered about reach rather than money: how many new leads the plan can possibly add.
- * Each query brings at most `cap` listings and the run ends at the target, so neither
- * number is a promise; together they are the ceiling.
+ * One structured search asks each source for at most `cap` listings and the run
+ * ends at the target, so the ceiling is a single min() — a promise about reach,
+ * not a count of what the directories actually hold.
  */
 export function leadCapacity(state: JobFormState): { ceiling: number; short: number } {
   if (state.tab === "import") return { ceiling: 0, short: 0 };
-  const queries = state.keywords.length * state.locations.length;
-  const perSource = Math.min(state.cap, state.target);
-  const ceiling = Math.min(state.target, queries * perSource);
+  if (!state.keyword.trim() || !state.city.trim() || !state.country) {
+    return { ceiling: 0, short: state.target };
+  }
+  const ceiling = Math.min(state.target, state.cap);
   return { ceiling, short: Math.max(0, state.target - ceiling) };
 }
 
 /**
- * Every paid source is asked the same question once per keyword x location pair, so
- * the invoice is knowable before any money goes out. The worker is what enforces the
- * monthly cap; this only warns that part of the run will never be sent.
+ * Every paid source is asked the one structured query once, so the invoice is
+ * knowable before any money goes out. The worker enforces the monthly cap; this
+ * only warns that part of the run will never be sent.
  */
 export function estimateRun(state: JobFormState, monthRemaining = Number.POSITIVE_INFINITY): RunEstimate {
   if (state.tab === "import") return { items: [], usd: 0, over: 0 };
-  const queries = state.keywords.length * state.locations.length;
   const items = state.sources
     .filter((source) => sourcePrice(source) != null)
     .map((source) => {
       // Past the target, rows are bought and thrown away.
-      const results = queries * Math.min(state.cap, state.target);
+      const results = Math.min(state.cap, state.target);
       return { source, label: sourceLabel(source), results, usd: estimateCost(source, results) };
     });
   const wanted = items.reduce((total, item) => total + item.results, 0);

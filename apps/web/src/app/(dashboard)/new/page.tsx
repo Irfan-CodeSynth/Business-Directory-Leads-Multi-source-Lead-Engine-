@@ -31,9 +31,9 @@ export default async function NewJobPage() {
           <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent">
             <Search className="h-4 w-4" />
           </div>
-          <div className="text-sm font-semibold text-ink">Keyword × location matrix</div>
+          <div className="text-sm font-semibold text-ink">One focused search</div>
           <div className="mt-1 text-xs text-muted">
-            Every keyword runs against every location — one courteous Overpass query at a time, or one Actor run per pair on a paid directory.
+            Keyword, category and a city inside a country — a question every source can answer, from the free map to a paid directory Actor.
           </div>
         </div>
 

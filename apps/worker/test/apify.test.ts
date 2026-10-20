@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BlockedError, makeBudget, makeSpend, type RawLead, type SearchHooks } from "../src/adapters/types.js";
+import { BlockedError, makeBudget, makeSpend, type RawLead, type SearchArgs, type SearchHooks } from "../src/adapters/types.js";
 import {
   buildActorInput,
   createApifyAdapter,
@@ -559,5 +559,41 @@ describe("createApifyAdapter().search", () => {
   it("leaves Yelp alone, which is asked for a place rather than a country", async () => {
     const made = harness({ source: "yelp", items: [yelpItem()], config: { ...testConfig, country: "Wakanda" } });
     expect((await made.adapter.search(unit, made.hooks)).emitted).toBe(1);
+  });
+});
+
+describe("buildActorInput with a structured spec", () => {
+  const specUnit: SearchArgs = {
+    keyword: "plumber",
+    location: "Austin, TX, United States",
+    maxItems: 25,
+    spec: { keyword: "plumber", category: "home-services", country: "US", state: "TX", city: "Austin" },
+  };
+
+  it("routes HotFrog to the job's country, not the global env, and drops the country from its location", () => {
+    expect(buildActorInput("hotfrog", specUnit, 25, { ...testConfig, country: "gb" })).toMatchObject({
+      country: "us",
+      locations: ["Austin, TX"],
+    });
+  });
+
+  it("asks Yelp for the city line, which is what it answers", () => {
+    expect(buildActorInput("yelp", specUnit, Number.POSITIVE_INFINITY, testConfig)).toMatchObject({
+      searchTerms: ["plumber"],
+      searchLocation: "Austin, TX",
+    });
+  });
+
+  it("keeps the env country as the fallback when the job has no spec", () => {
+    expect(buildActorInput("hotfrog", unit, 25, { ...testConfig, country: "gb" })).toMatchObject({
+      country: "gb",
+      locations: ["Austin, TX"],
+    });
+  });
+
+  it("still refuses a HotFrog search for a country no form could have produced", () => {
+    expect(() =>
+      buildActorInput("hotfrog", { ...specUnit, spec: { ...specUnit.spec!, country: "ZZ" as never } }, 25, testConfig),
+    ).toThrow(/country/i);
   });
 });

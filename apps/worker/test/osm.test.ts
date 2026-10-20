@@ -753,3 +753,22 @@ describe("createOsmAdapter().search", () => {
     expect(logs.join("\n")).toMatch(/error, but elements below are fine/);
   });
 });
+
+describe("selectorsForKeyword with a category", () => {
+  it("adds the curated map tags when the run names a category", () => {
+    const selectors = selectorsForKeyword("acme repair", "home-services");
+    expect(selectors).toContain('["craft"="plumber"]');
+    expect(selectors).toContain('["craft"="electrician"]');
+    // the keyword still contributes its name pattern
+    expect(selectors.some((s) => s.startsWith('["name"'))).toBe(true);
+  });
+
+  it('"any" adds no clauses of its own', () => {
+    expect(selectorsForKeyword("acme repair", "any")).toEqual(selectorsForKeyword("acme repair"));
+    expect(selectorsForKeyword("acme repair", null)).toEqual(selectorsForKeyword("acme repair"));
+  });
+
+  it("a category alone still queries: its tags arrive even when the keyword maps to nothing", () => {
+    expect(selectorsForKeyword("xyzzy", "automotive")).toContain('["shop"="car_repair"]');
+  });
+});

@@ -1,3 +1,4 @@
+import { categoryById } from "@dleads/db";
 import type {
   RawLead,
   RequestBudget,
@@ -360,15 +361,17 @@ function wordVariants(word: string): string[] {
  * Tag filters plus a `name` pattern. OSM tagging alone misses most service
  * businesses, because a plumbing van is usually only tagged by its name.
  */
-export function selectorsForKeyword(keyword: string): string[] {
+export function selectorsForKeyword(keyword: string, categoryId?: string | null): string[] {
+  // The category contributes its curated map tags up front: a loose keyword ("acme
+  // repair") narrows nothing, but home-services says which trades to sweep.
+  const selectors = new Set<string>(categoryById(categoryId ?? "any")?.osmTags ?? []);
   const normalised = keyword
     .toLowerCase()
     .replace(/[^a-z0-9 ]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (!normalised) return [];
+  if (!normalised) return [...selectors];
 
-  const selectors = new Set<string>();
   // Look up the whole phrase, then each word: "dental clinic" should still hit
   // the dentist tags even though the phrase itself is not in the table.
   const words = normalised.split(" ").filter((w) => w.length > 2 && !STOP_WORDS.has(w));
@@ -825,7 +828,7 @@ export function createOsmAdapter(options: OsmAdapterOptions = {}): SourceAdapter
       let stopped = false;
 
       const area = await resolveArea(args.location, cfg, hooks, fetchFn, sleepFn);
-      const selectors = selectorsForKeyword(args.keyword);
+      const selectors = selectorsForKeyword(args.keyword, args.spec?.category);
       if (selectors.length === 0) {
         hooks.log(`osm: keyword "${args.keyword}" produced no usable selectors`);
         return { emitted, requestsUsed: hooks.budget.spent(), stopped };

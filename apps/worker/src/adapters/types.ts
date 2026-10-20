@@ -1,4 +1,4 @@
-import type { Source } from "@dleads/db";
+import type { SearchSpec, Source } from "@dleads/db";
 
 /**
  * One business exactly as a source published it, before the dedup tiers run.
@@ -31,6 +31,12 @@ export interface SearchArgs {
   keyword: string;
   location: string;
   maxItems: number;
+  /**
+   * The structured spec behind a modern run. When present an adapter builds its
+   * query from these fields — country as its own input, category as the source's
+   * own taxonomy — instead of guessing from the free-text `location`.
+   */
+  spec?: SearchSpec;
 }
 
 /** Caps requests so a misbehaving source cannot hammer a service all night. */

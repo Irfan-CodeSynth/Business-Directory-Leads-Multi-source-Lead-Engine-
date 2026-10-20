@@ -18,7 +18,7 @@ import {
   type SearchOutcome,
   type SourceAdapter,
 } from "../src/adapters/types.js";
-import { claimJob, closeOrphanedSourceStats, processJob, requeueRunningJobs } from "../src/job.js";
+import { claimJob, closeOrphanedSourceStats, processJob, requeueRunningJobs, workUnits } from "../src/job.js";
 import { startTestDb, truncateAll, type TestDb } from "./pglite.js";
 
 let db: Db;
@@ -69,6 +69,9 @@ class Scripted implements SourceAdapter {
   requests = 0;
   /** What each work unit was asked for, so a clamp can be seen rather than trusted. */
   asks: number[] = [];
+  /** The structured spec and location line each unit carried, for the search_spec tests. */
+  specs: (SearchArgs["spec"] | undefined)[] = [];
+  locations: string[] = [];
 
   constructor(
     source: Source,
@@ -81,6 +84,8 @@ class Scripted implements SourceAdapter {
   async search(args: SearchArgs, hooks: SearchHooks): Promise<SearchOutcome> {
     const index = this.unit++;
     this.asks.push(args.maxItems);
+    this.specs.push(args.spec);
+    this.locations.push(args.location);
     hooks.budget.charge(1);
     this.requests++;
     const fail = this.failOn?.(index);
@@ -734,5 +739,58 @@ describe("paid sources", () => {
       requestsUsed: 2,
       found: 1,
     });
+  });
+});
+
+describe("structured search (search_spec)", () => {
+  const SPEC = { keyword: "plumber", category: "home-services", country: "US", state: "TX", city: "Austin" };
+
+  it("replaces the keyword x location matrix with one spec-carrying unit", async () => {
+    const job = await newJob({ searchSpec: SPEC });
+    expect(workUnits("osm", job)).toEqual([
+      { keyword: "plumber", location: "Austin, TX, United States", maxItems: 25, spec: SPEC },
+    ]);
+  });
+
+  it("runs the legacy matrix when no spec is stored", async () => {
+    const job = await newJob({ keywords: ["plumber", "dentist"], locations: ["Austin, TX", "Dallas, TX"] });
+    expect(workUnits("osm", job).map((u) => `${u.keyword} @ ${u.location}`)).toEqual([
+      "plumber @ Austin, TX",
+      "dentist @ Austin, TX",
+      "plumber @ Dallas, TX",
+      "dentist @ Dallas, TX",
+    ]);
+  });
+
+  it("ignores the spec for a csv import, which takes its rows from the job", async () => {
+    const job = await newJob({ searchSpec: SPEC, importRows: [{ name: "Acme Plumbing" }], importLabel: "pasted list" });
+    const units = workUnits("csv", job);
+    expect(units).toHaveLength(1);
+    expect(units[0]!.keyword).toBe("pasted list");
+    expect(units[0]!.spec).toBeUndefined();
+  });
+
+  it("hands the spec and the geocodable location line to the adapter", async () => {
+    const job = await newJob({ sources: ["osm"], searchSpec: SPEC });
+    const osm = new Scripted("osm", [[listing()]]);
+    await processJob(db, job, { adapter: () => osm, log: quiet, ...noEnrich });
+    expect(osm.specs).toEqual([SPEC]);
+    expect(osm.locations).toEqual(["Austin, TX, United States"]);
+    expect(await jobRow(job.id)).toMatchObject({ status: "done", leadsFound: 1 });
+  });
+
+  it("counts one structured unit per source, where a matrix job counts each pair", async () => {
+    const job = await newJob({ sources: ["osm", "yelp"], searchSpec: SPEC });
+    await processJob(db, job, {
+      adapter: (source) => new Scripted(source, []),
+      log: quiet,
+      ...noEnrich,
+    });
+    // The display arrays carry the same values a two-row matrix would, but the spec
+    // path asks each source exactly once — and a Scripted unit charges one request.
+    expect(workUnits("osm", job)).toHaveLength(1);
+    expect(workUnits("yelp", job)).toHaveLength(1);
+    expect(await statRow(job.id, "osm")).toMatchObject({ status: "done", requestsUsed: 1 });
+    expect(await statRow(job.id, "yelp")).toMatchObject({ status: "done", requestsUsed: 1 });
   });
 });

@@ -1,4 +1,4 @@
-import type { PaidSource } from "@dleads/db";
+import { countryName, locationLine, type PaidSource } from "@dleads/db";
 import {
   BlockedError,
   BudgetExhaustedError,
@@ -338,10 +338,14 @@ export function buildActorInput(
   cfg: ApifyConfig,
 ): Record<string, unknown> {
   const maxItems = bounded(args.maxItems, remaining);
+  // A structured spec says which parts of the location are the city and which is
+  // the country — exactly the split both Actors want made for them.
+  const spec = args.spec;
+  const place = spec ? locationLine(spec, "short") : args.location;
   if (source === "yelp") {
     return {
       searchTerms: [args.keyword],
-      searchLocation: args.location,
+      searchLocation: place,
       maxItems,
       // Every paid extra that is not a contact detail stays off: reviews are the
       // expensive ones and the only ones we may not keep.
@@ -352,7 +356,10 @@ export function buildActorInput(
       fetchBusinessDetails: true,
     };
   }
-  const country = toCountryCode(cfg.country);
+  if (spec && !countryName(spec.country)) {
+    throw new Error(`${source}: search spec country "${spec.country}" is not a country this Actor accepts`);
+  }
+  const country = toCountryCode(spec?.country ?? cfg.country);
   if (!country) {
     throw new Error(
       `${source}: APIFY_COUNTRY "${cfg.country}" is not a country this Actor accepts — use its two-letter code (us, gb, in, au, ca, …)`,
@@ -360,7 +367,7 @@ export function buildActorInput(
   }
   return {
     searchTerms: [args.keyword],
-    locations: [args.location],
+    locations: [place],
     country,
     maxResults: maxItems,
     includeDetails: true,

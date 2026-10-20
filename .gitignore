@@ -4,6 +4,10 @@ dist/
 *.tsbuildinfo
 .env
 .env.local
+# Every .env variant holds live secrets (the Neon password, the Apify token), including the
+# dated copies the deploy steps make. .env.example is the one that must stay in the repo.
+.env.*
+!.env.example
 .vercel
 data/
 *.log

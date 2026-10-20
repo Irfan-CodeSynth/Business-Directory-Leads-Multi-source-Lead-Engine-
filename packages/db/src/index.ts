@@ -6,6 +6,7 @@ export * from "./schema.js";
 export * from "./dedup.js";
 export * from "./delete.js";
 export * from "./loadRootEnv.js";
+export * from "./search.js";
 
 type SqlClient = ReturnType<typeof postgres>;
 

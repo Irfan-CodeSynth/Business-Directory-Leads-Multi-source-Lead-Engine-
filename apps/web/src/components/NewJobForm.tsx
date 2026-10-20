@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CATEGORIES, COUNTRIES } from "@dleads/db/search";
 import { MAPPABLE_FIELDS, applyMapping, autoMap, toTable, type MappableField } from "@/lib/csv";
 import { buildJobRequest, estimateRun, leadCapacity } from "@/lib/newJob";
 import { isPaidSource, priceNote, usd } from "@/lib/sourceMeta";
@@ -19,8 +20,6 @@ import {
   Table2,
   Receipt,
 } from "lucide-react";
-
-const MAX = 20;
 
 const SOURCE_OPTIONS = [
   {
@@ -45,27 +44,17 @@ const SOURCE_OPTIONS = [
   },
 ] as const;
 
+/**
+ * Presets fill the structured fields with a known-good target, so a first run
+ * lands in a city-sized place — the size of search every source can actually
+ * answer.
+ */
 const PRESETS = [
-  {
-    name: "Home Services",
-    keywords: ["plumber", "electrician", "hvac contractor", "roofing company"],
-    locations: ["Austin, TX", "Dallas, TX"],
-  },
-  {
-    name: "Healthcare",
-    keywords: ["dental clinic", "orthodontist", "chiropractor", "dermatologist"],
-    locations: ["Miami, FL", "Tampa, FL"],
-  },
-  {
-    name: "Real Estate & Legal",
-    keywords: ["real estate agency", "property management", "personal injury lawyer"],
-    locations: ["Phoenix, AZ", "Scottsdale, AZ"],
-  },
-];
-
-function parseLines(text: string): string[] {
-  return [...new Set(text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean))];
-}
+  { name: "Home Services", category: "home-services", keyword: "plumber", city: "Austin", state: "TX", country: "US" },
+  { name: "Healthcare", category: "health-medical", keyword: "dental clinic", city: "Miami", state: "FL", country: "US" },
+  { name: "Real Estate", category: "real-estate", keyword: "real estate agency", city: "Phoenix", state: "AZ", country: "US" },
+  { name: "Restaurants", category: "food-restaurants", keyword: "restaurant", city: "Denver", state: "CO", country: "US" },
+] as const;
 
 /** Both number fields allow 1–200, which is exactly what the API clamps to. */
 const clampCount = (value: string) => Math.min(Math.max(Number(value) || 1, 1), 200);
@@ -76,8 +65,11 @@ export default function NewJobForm({ apify, onSuccess }: { apify: ApifyBudget; o
 
   const [tab, setTab] = useState<"discover" | "import">("discover");
   const [sources, setSources] = useState<string[]>(["osm"]);
-  const [keywords, setKeywords] = useState("");
-  const [locations, setLocations] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [category, setCategory] = useState("any");
+  const [country, setCountry] = useState("US");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
   const [cap, setCap] = useState(100);
   const [target, setTarget] = useState(100);
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -92,18 +84,18 @@ export default function NewJobForm({ apify, onSuccess }: { apify: ApifyBudget; o
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const kw = useMemo(() => parseLines(keywords), [keywords]);
-  const loc = useMemo(() => parseLines(locations), [locations]);
   const wantsOsm = sources.includes("osm");
   const paid = sources.filter(isPaidSource);
   const importing = tab === "import";
-  const searches = kw.length * loc.length;
-  const estimate = useMemo(
-    () => estimateRun({ tab, sources, keywords: kw, locations: loc, cap, target, rows, mapping, label }, apify.monthRemaining),
-    [tab, sources, kw, loc, cap, target, rows, mapping, label, apify.monthRemaining],
-  );
+  /** A search every source can be asked: keyword in one hand, a real city in the other. */
+  const ready = Boolean(keyword.trim() && city.trim() && country);
+  const formState = { tab, sources, keyword, category, country, state, city, cap, target, rows, mapping, label };
+  const estimate = useMemo(() => estimateRun(formState, apify.monthRemaining), [
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    tab, sources, keyword, category, country, state, city, cap, target, apify.monthRemaining,
+  ]);
   /** What the plan can honestly reach before the worker stops it at the target. */
-  const capacity = leadCapacity({ tab, sources, keywords: kw, locations: loc, cap, target, rows, mapping, label });
+  const capacity = leadCapacity(formState);
   /** Exactly the rows that will be sent: unmappable columns are gone, nameless rows too. */
   const mappedRows = useMemo(() => (importing ? applyMapping(rows, mapping) : []), [importing, rows, mapping]);
 
@@ -113,15 +105,26 @@ export default function NewJobForm({ apify, onSuccess }: { apify: ApifyBudget; o
   }
 
   function applyPreset(preset: (typeof PRESETS)[number]) {
-    setKeywords(preset.keywords.join("\n"));
-    setLocations(preset.locations.join("\n"));
+    setKeyword(preset.keyword);
+    setCategory(preset.category);
+    setCity(preset.city);
+    setState(preset.state);
+    setCountry(preset.country);
     setActivePreset(preset.name);
     setError(null);
   }
 
   function handleReset() {
-    setKeywords("");
-    setLocations("");
+    setKeyword("");
+    setCategory("any");
+    setCity("");
+    setState("");
+    setCountry("US");
+    setActivePreset(null);
+    setError(null);
+  }
+
+  function touch() {
     setActivePreset(null);
     setError(null);
   }
@@ -157,7 +160,7 @@ export default function NewJobForm({ apify, onSuccess }: { apify: ApifyBudget; o
 
   async function submit(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    const request = buildJobRequest({ tab, sources, keywords: kw, locations: loc, cap, target, rows, mapping, label });
+    const request = buildJobRequest(formState);
     if (!request.ok) return setError(request.error);
 
     setBusy(true);
@@ -191,6 +194,7 @@ export default function NewJobForm({ apify, onSuccess }: { apify: ApifyBudget; o
     "w-full rounded-2xl border border-line bg-surface2/60 p-4 font-mono text-sm text-ink outline-none transition placeholder:text-soft focus:border-accent focus:bg-surface focus:ring-4 focus:ring-accent/15";
   const card =
     "flex flex-col rounded-3xl border border-line bg-surface p-5 shadow-card transition-all focus-within:border-accent/50 focus-within:shadow-lift";
+  const selectField = `${field} appearance-none`;
 
   return (
     <form onSubmit={submit} className="space-y-6">
@@ -266,7 +270,7 @@ export default function NewJobForm({ apify, onSuccess }: { apify: ApifyBudget; o
                 <Sparkles className="h-3.5 w-3.5 text-accent" />
                 Industry presets
               </span>
-              {(keywords || locations) && (
+              {(keyword || city) && (
                 <button
                   type="button"
                   onClick={handleReset}
@@ -298,87 +302,115 @@ export default function NewJobForm({ apify, onSuccess }: { apify: ApifyBudget; o
             </div>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className={card}>
-              <div className="mb-2 flex items-center justify-between">
-                <label htmlFor="keywords" className="flex items-center gap-2 text-sm font-semibold text-ink">
-                  <Building2 className="h-4 w-4 text-accent" />
-                  Keywords / trades
-                </label>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums transition ${
-                    kw.length > 0 ? "bg-accent/15 text-accent" : "bg-surface2 text-soft"
-                  }`}
-                >
-                  {kw.length} / {MAX}
-                </span>
-              </div>
-              <p className="mb-3 text-xs text-muted">
-                One per line. Free-text terms are matched against business names as well as map
-                categories, so plain words work.
-              </p>
-              <textarea
-                id="keywords"
-                value={keywords}
-                onChange={(e) => {
-                  setKeywords(e.target.value);
-                  setActivePreset(null);
-                }}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit();
-                }}
-                rows={6}
-                placeholder={"plumber\ndentist\nlandscaper"}
-                className={field}
-              />
+          <div className={card}>
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
+              <Building2 className="h-4 w-4 text-accent" />
+              What kind of business, and where
+              <span className="ml-auto rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-semibold text-accent tabular-nums">
+                one focused search
+              </span>
             </div>
-
-            <div className={card}>
-              <div className="mb-2 flex items-center justify-between">
-                <label htmlFor="locations" className="flex items-center gap-2 text-sm font-semibold text-ink">
-                  <MapPin className="h-4 w-4 text-info-fg" />
-                  Locations
-                </label>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums transition ${
-                    loc.length > 0 ? "bg-info-fg/15 text-info-fg" : "bg-surface2 text-soft"
-                  }`}
+            <p className="mb-4 text-xs text-muted">
+              Every source answers a city-sized question. A whole country is too big for the free map
+              server and too vague for the paid directories — pick the city your customers are in.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-muted">Keyword</span>
+                <input
+                  value={keyword}
+                  onChange={(e) => {
+                    setKeyword(e.target.value);
+                    touch();
+                  }}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit();
+                  }}
+                  placeholder="plumber"
+                  className={field}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-muted">Category</span>
+                <select
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    touch();
+                  }}
+                  className={selectField}
                 >
-                  {loc.length} / {MAX}
-                </span>
+                  {CATEGORIES.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-muted">Country</span>
+                <select
+                  value={country}
+                  onChange={(e) => {
+                    setCountry(e.target.value);
+                    touch();
+                  }}
+                  className={selectField}
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-muted">State / region</span>
+                  <input
+                    value={state}
+                    onChange={(e) => {
+                      setState(e.target.value);
+                      touch();
+                    }}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit();
+                    }}
+                    placeholder="TX"
+                    className={field}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-muted">City</span>
+                  <input
+                    value={city}
+                    onChange={(e) => {
+                      setCity(e.target.value);
+                      touch();
+                    }}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit();
+                    }}
+                    placeholder="Austin"
+                    className={field}
+                  />
+                </label>
               </div>
-              <p className="mb-3 text-xs text-muted">
-                City and state, or a postcode. Each one is geocoded once and cached.
-              </p>
-              <textarea
-                id="locations"
-                value={locations}
-                onChange={(e) => {
-                  setLocations(e.target.value);
-                  setActivePreset(null);
-                }}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit();
-                }}
-                rows={6}
-                placeholder={"Austin, TX\nRound Rock, TX\n78704"}
-                className={field}
-              />
             </div>
           </div>
 
-          {searches > 0 && (wantsOsm || paid.length > 0) && (
+          {ready && (wantsOsm || paid.length > 0) && (
             <>
               <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface2/40 px-4 py-3">
                 <p className="text-xs text-muted">
-                  Each source stops at <span className="font-semibold text-ink tabular-nums">{target}</span> new leads,
-                  whichever query reaches it first — this plan can bring at most{" "}
-                  <span className="font-semibold text-ink tabular-nums">{capacity.ceiling.toLocaleString()}</span>.
-                  Businesses already in the ledger are skipped and do not count toward the target.
+                  Each source stops at <span className="font-semibold text-ink tabular-nums">{target}</span> new leads.
+                  This plan can bring at most{" "}
+                  <span className="font-semibold text-ink tabular-nums">{capacity.ceiling.toLocaleString()}</span> —
+                  businesses already in the ledger are skipped and do not count toward the target.
                 </p>
                 <div className="flex flex-wrap gap-4">
                   <label className="flex items-center gap-2 text-xs font-medium text-muted">
-                    Cap per query
+                    Cap per source
                     <input
                       type="number"
                       min={1}
@@ -406,16 +438,16 @@ export default function NewJobForm({ apify, onSuccess }: { apify: ApifyBudget; o
                 <div className="animate-fade-in flex items-start gap-2.5 rounded-xl border border-warn-fg/25 bg-warn-bg/40 p-3.5 text-xs text-warn-fg">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span>
-                    {searches} quer{searches === 1 ? "y" : "ies"} at cap {cap} cannot reach {target}: this run will
-                    stop at {capacity.ceiling.toLocaleString()} new leads per source. Add keywords or nearby cities,
-                    raise the cap, or lower the number you want.
+                    One search at cap {cap} cannot reach {target}: this run will stop at{" "}
+                    {capacity.ceiling.toLocaleString()} new leads per source. Raise the cap or lower the number you
+                    want.
                   </span>
                 </div>
               )}
             </>
           )}
 
-          {wantsOsm && searches > 0 && (
+          {wantsOsm && ready && (
             <div className="animate-fade-in flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent/20 bg-accent-soft/40 p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-white shadow-accent">
@@ -424,15 +456,14 @@ export default function NewJobForm({ apify, onSuccess }: { apify: ApifyBudget; o
                 <div>
                   <div className="text-sm font-semibold text-ink">OpenStreetMap costs nothing per result</div>
                   <div className="text-xs text-muted">
-                    Queries run about one every {Math.round(cap / 10)} seconds to stay inside the free-tier
-                    courtesy limits.
+                    The open map is free — the only limit is courtesy: about one polite query per second.
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {estimate.items.length > 0 && searches > 0 && (
+          {estimate.items.length > 0 && ready && (
             <div className="animate-fade-in space-y-2 rounded-2xl border border-warn-fg/25 bg-warn-bg/50 p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warn-fg text-white">

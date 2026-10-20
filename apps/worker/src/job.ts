@@ -1,10 +1,13 @@
 import { and, eq, ne, sql } from "drizzle-orm";
 import {
+  isSearchSpec,
   jobSourceStats,
   jobs,
+  locationLine,
   sourceStatus,
   type Db,
   type Job,
+  type SearchSpec,
   type Source,
 } from "@dleads/db";
 import { createOsmAdapter, osmConfig } from "./adapters/osm.js";
@@ -159,10 +162,19 @@ function adapterFor(source: Source, job: Job, spend: ResultSpend): SourceAdapter
   return createOsmAdapter({ config: osmConfig() });
 }
 
-/** A file import is one pass over the list; a directory source is keyword x location. */
-export function workUnits(source: Source, job: Job): { keyword: string; location: string; maxItems: number }[] {
+/** A file import is one pass over the list; a directory source is one search. */
+export function workUnits(
+  source: Source,
+  job: Job,
+): { keyword: string; location: string; maxItems: number; spec?: SearchSpec }[] {
   if (source === "csv") {
     return [{ keyword: job.importLabel ?? "import", location: "", maxItems: Number.MAX_SAFE_INTEGER }];
+  }
+  // The structured spec is one focused question — one keyword in one city — and it
+  // says where the country and category go, which is what a free-text location
+  // cannot. A job row without one is the old matrix, and runs exactly as before.
+  if (isSearchSpec(job.searchSpec)) {
+    return [{ keyword: job.searchSpec.keyword, location: locationLine(job.searchSpec, "full"), maxItems: job.maxItems, spec: job.searchSpec }];
   }
   return job.locations.flatMap((location) =>
     job.keywords.map((keyword) => ({ keyword, location, maxItems: job.maxItems })),
